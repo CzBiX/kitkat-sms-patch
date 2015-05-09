@@ -1,0 +1,26 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 22
+    buildToolsVersion '20.0.0'
+    defaultConfig {
+        applicationId 'com.czbix.xposed.kitkat_sms_patch'
+        minSdkVersion 19
+        targetSdkVersion 21
+        versionCode 6
+        versionName '1.4.1'
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    productFlavors {
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    provided fileTree(dir: 'deps', include: ['*.jar'])
+}
