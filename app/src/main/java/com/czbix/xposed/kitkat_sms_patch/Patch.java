@@ -46,12 +46,12 @@ public class Patch implements IXposedHookZygoteInit {
         return VERSION.SDK_INT >= VERSION_CODES.KITKAT;
     }
 
-    private static boolean isLolliPopOrLater() {
+    private static boolean isLollipopOrLater() {
         return VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP;
     }
 
     private void allowAbortSmsBroadcast() {
-        if (isLolliPopOrLater()) {
+        if (isLollipopOrLater()) {
             XposedHelpers.findAndHookMethod(InboundSmsHandler.class, "dispatchIntent",
                     Intent.class, String.class, int.class, BroadcastReceiver.class, UserHandle.class,
                     dispatchIntentHook);
@@ -111,7 +111,7 @@ public class Patch implements IXposedHookZygoteInit {
             int appOp = ((Integer) param.args[2]);
             BroadcastReceiver receiver = (BroadcastReceiver) param.args[3];
 
-            if (isLolliPopOrLater()) {
+            if (isLollipopOrLater()) {
                 handleForLP(param, context, intent, perm, appOp, receiver);
             } else {
                 callSendBroadcast(param.thisObject, context, intent, perm, appOp, receiver);
