@@ -2,11 +2,11 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 22
-    buildToolsVersion '20.0.0'
+    buildToolsVersion '22.0.0'
     defaultConfig {
         applicationId 'com.czbix.xposed.kitkat_sms_patch'
         minSdkVersion 19
-        targetSdkVersion 21
+        targetSdkVersion 22
         versionCode 7
         versionName '1.5'
     }
