@@ -6,8 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.os.Build.VERSION;
-import android.os.Build.VERSION_CODES;
+import android.os.Bundle;
 import android.os.UserHandle;
 import android.provider.Telephony.Sms.Intents;
 import android.telephony.SubscriptionManager;
@@ -24,14 +23,15 @@ import de.robv.android.xposed.XposedHelpers;
 public class Patch implements IXposedHookZygoteInit {
     private static final String TAG = Patch.class.getName();
 
-    private static final Class<?> smsBroadcastReceiver = XposedHelpers.findClass("com.android.internal.telephony.InboundSmsHandler$SmsBroadcastReceiver", ClassLoader.getSystemClassLoader());
+    private static final Class<?> smsBroadcastReceiver = XposedHelpers.findClass(
+            "com.android.internal.telephony.InboundSmsHandler$SmsBroadcastReceiver", null);
 
     private SmsReceiver smsReceiver;
     private SmsReceiver mmsReceiver;
 
     @Override
     public void initZygote(StartupParam startupParam) throws Throwable {
-        if (!isKitKatOrLater()) {
+        if (!Utils.isKkOrLater) {
             Log.e(TAG, "older than KitKat, skip init zygote!");
             return;
         }
@@ -42,16 +42,12 @@ public class Patch implements IXposedHookZygoteInit {
         Log.i(TAG, "KitKat SMS Patch loaded!");
     }
 
-    private static boolean isKitKatOrLater() {
-        return VERSION.SDK_INT >= VERSION_CODES.KITKAT;
-    }
-
-    private static boolean isLollipopOrLater() {
-        return VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP;
-    }
-
     private void allowAbortSmsBroadcast() {
-        if (isLollipopOrLater()) {
+        if (Utils.isMmOrLater) {
+            XposedHelpers.findAndHookMethod(InboundSmsHandler.class, "dispatchIntent",
+                    Intent.class, String.class, int.class, Bundle.class, BroadcastReceiver.class, UserHandle.class,
+                    dispatchIntentHook);
+        } else if (Utils.isLpOrLater) {
             XposedHelpers.findAndHookMethod(InboundSmsHandler.class, "dispatchIntent",
                     Intent.class, String.class, int.class, BroadcastReceiver.class, UserHandle.class,
                     dispatchIntentHook);
@@ -109,10 +105,13 @@ public class Patch implements IXposedHookZygoteInit {
 
             String perm = (String) param.args[1];
             int appOp = ((Integer) param.args[2]);
-            BroadcastReceiver receiver = (BroadcastReceiver) param.args[3];
+            BroadcastReceiver receiver = (BroadcastReceiver) param.args[Utils.isMmOrLater ? 4 : 3];
 
-            if (isLollipopOrLater()) {
-                handleForLP(param, context, intent, perm, appOp, receiver);
+            if (Utils.isMmOrLater) {
+                final Bundle opts = (Bundle) param.args[3];
+                handleForMm(param, context, intent, perm, appOp, opts, receiver);
+            } else if (Utils.isLpOrLater) {
+                handleForLp(param, context, intent, perm, appOp, receiver);
             } else {
                 callSendBroadcast(param.thisObject, context, intent, perm, appOp, receiver);
             }
@@ -122,7 +121,20 @@ public class Patch implements IXposedHookZygoteInit {
         }
     };
 
-    private void handleForLP(MethodHookParam param, Context context, Intent intent, String perm,
+    private void handleForMm(MethodHookParam param, Context context, Intent intent, String perm,
+                             int appOp, Bundle opts, BroadcastReceiver receiver) {
+        UserHandle userHandle = (UserHandle) param.args[5];
+
+        putPhoneIdAndSubIdExtra(param.thisObject, intent);
+        if (isAllUser(userHandle)) {
+            Log.w(TAG, "there is a bug that only broadcast intent to owner user");
+            userHandle = (UserHandle) XposedHelpers.getStaticObjectField(UserHandle.class, "OWNER");
+        }
+
+        callSendBroadcastAsUser(param.thisObject, context, intent, userHandle, perm, appOp, opts, receiver);
+    }
+
+    private void handleForLp(MethodHookParam param, Context context, Intent intent, String perm,
                              int appOp, BroadcastReceiver receiver) {
         UserHandle userHandle = (UserHandle) param.args[4];
 
@@ -162,6 +174,13 @@ public class Patch implements IXposedHookZygoteInit {
         } else {
             smsReceiver = receiver;
         }
+    }
+
+    private static void callSendBroadcastAsUser(Object thisObject, Context context, Intent intent,
+                                                UserHandle user, String perm, int appOp, Bundle opts,
+                                                BroadcastReceiver receiver) {
+        XposedHelpers.callMethod(context, "sendOrderedBroadcastAsUser", intent, user, perm,
+                appOp, opts, receiver, XposedHelpers.callMethod(thisObject, "getHandler"), Activity.RESULT_OK, null, null);
     }
 
     private static void callSendBroadcastAsUser(Object thisObject, Context context, Intent intent,
