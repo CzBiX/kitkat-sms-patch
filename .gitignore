@@ -5,3 +5,11 @@
 .DS_Store
 /build
 /app/deps/telephony-common*
+/captures
+/.navigation/
+fabric.properties
+
+# IDEA/Android Studio project files, because
+# the project can be imported from settings.gradle
+.idea
+*.iml
